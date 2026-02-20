@@ -78,13 +78,13 @@ const stmts = {
 };
 
 // In-memory map for megajs File objects (not serializable)
-const folderCache = new Map<string, mega.MutableFile>();
+const folderCache = new Map<string, mega.File>();
 
 // Download queue
 interface DownloadTask {
   folderId: string;
   nodeId: string;
-  megaFile: mega.MutableFile;
+  megaFile: mega.File;
   name: string;
   size: number;
 }
@@ -152,7 +152,7 @@ async function downloadFile(task: DownloadTask): Promise<void> {
 
   return new Promise<void>((resolve) => {
     try {
-      const stream = megaFile.download();
+      const stream = megaFile.download({});
       const writeStream = fs.createWriteStream(filePath);
 
       stream.on('error', (err: Error) => {
@@ -249,11 +249,11 @@ async function loadMegaFolder(url: string): Promise<{ folderId: string; name: st
   stmts.insertFolder.run(folderId, folderKey, folderName, now, 0, 0, null);
 
   // Cache the folder object
-  folderCache.set(folderId, folder as mega.MutableFile);
+  folderCache.set(folderId, folder as mega.File);
 
   // Get all files in folder
   const children = folder.children || [];
-  const files = children.filter((child: mega.MutableFile) => !child.directory);
+  const files = children.filter((child: mega.File) => !child.directory);
 
   // Save files to DB and queue downloads
   for (const file of files) {
@@ -302,13 +302,13 @@ async function retryFailedDownloads(folderId: string): Promise<number> {
   let megaFolder = folderCache.get(folderId);
   if (!megaFolder) {
     const url = `https://mega.nz/folder/${folderId}#${folder.folder_key}`;
-    megaFolder = mega.File.fromURL(url) as mega.MutableFile;
+    megaFolder = mega.File.fromURL(url) as mega.File;
     await megaFolder.loadAttributes();
     folderCache.set(folderId, megaFolder);
   }
 
   const children = megaFolder.children || [];
-  const filesMap = new Map<string, mega.MutableFile>();
+  const filesMap = new Map<string, mega.File>();
   for (const child of children) {
     if (!child.directory) {
       const nodeId = child.nodeId || child.downloadId?.[1] || '';
@@ -592,12 +592,12 @@ async function resumeDownloads(): Promise<void> {
     try {
       // Load folder from MEGA
       const url = `https://mega.nz/folder/${folderId}#${folder.folder_key}`;
-      const megaFolder = mega.File.fromURL(url) as mega.MutableFile;
+      const megaFolder = mega.File.fromURL(url) as mega.File;
       await megaFolder.loadAttributes();
       folderCache.set(folderId, megaFolder);
 
       const children = megaFolder.children || [];
-      const filesMap = new Map<string, mega.MutableFile>();
+      const filesMap = new Map<string, mega.File>();
       for (const child of children) {
         if (!child.directory) {
           const nodeId = child.nodeId || child.downloadId?.[1] || '';
