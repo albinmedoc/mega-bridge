@@ -1,39 +1,30 @@
-# Task: Implement mega-bridge
+# Task: Rewrite mega-bridge in TypeScript with ALL endpoints
 
-Create the complete mega-bridge project as specified below. All code goes in a single `server.js` file.
+## Feedback from reviewer
+"Du har inte följt Kortets beskrivning, det saknas t.ex många endpoints. Du skulle även kunna skriva det i TypeScript"
 
-## What to create:
-1. `server.js` - All application code
-2. `package.json` - With megajs and better-sqlite3 dependencies
-3. `Dockerfile` - Multi-stage build with node:20-slim
-4. `.dockerignore` - node_modules, .git
-5. `README.md` - API docs with curl examples
-6. `.github/workflows/docker.yml` - Build & push to ghcr.io/albinmedoc/mega-bridge on push to main, tag with latest + git SHA
+## What needs to happen
 
-## Full Specification
+1. **Convert to TypeScript** - Rename server.js to server.ts, add tsconfig.json, typescript as dev dep, build step
+2. **Implement ALL endpoints from the spec** (currently only /download and /health exist):
+   - `GET /health` - Health check
+   - `GET /folder` - List all loaded folders with aggregated download status
+   - `POST /folder` - Load a shared MEGA folder, start background downloads
+   - `GET /folder/:folderId` - Status for specific folder and all its files
+   - `GET /folder/:folderId/:nodeId` - Download a specific file (stream from disk)
+   - `DELETE /folder/:folderId` - Remove folder and delete files from disk
+   - `POST /folder/:folderId/retry` - Retry failed downloads
 
-See the card description for complete API spec, database schema, download worker logic, rate limiting, etc.
+3. **Use Node.js built-in `http` module** - NO Express, NO Fastify
+4. **Use `better-sqlite3`** for persistence (SQLite)
+5. **Use `megajs`** for MEGA downloads
+6. **Background download workers** with configurable concurrency (MAX_CONCURRENT, default 2)
+7. **Rate limit handling** - detect ETOOMANY, mark folder as rate limited, auto-retry via global setInterval (RETRY_INTERVAL minutes, default 60)
+8. **File storage** at DOWNLOAD_DIR/<folderId>/<nodeId>_<filename>
+9. **On startup**, resume interrupted downloads (check DB for pending/downloading files)
+10. **Route parsing** - manual URL parsing, no framework
 
-Key points:
-- Node.js 20, no framework (built-in http module only)
-- Dependencies: megajs, better-sqlite3
-- SQLite for state, in-memory Map for megajs folder objects
-- Background download workers with configurable concurrency
-- ETOOMANY rate limit handling with automatic retry
-- Stream files to/from disk, never hold in memory
-- Resume downloads on restart by checking DB state
-- Env vars: PORT (3000), DOWNLOAD_DIR (/data/files), DB_PATH (/data/mega-bridge.db), MAX_CONCURRENT (2), RETRY_INTERVAL (60)
-
-## API Endpoints:
-- GET /health
-- GET /folder - list all folders with aggregate status
-- POST /folder - load shared MEGA folder, start background downloads
-- GET /folder/:folderId - folder status + all files
-- GET /folder/:folderId/:nodeId - download file (stream from disk)
-- DELETE /folder/:folderId - remove folder + files
-- POST /folder/:folderId/retry - retry failed downloads
-
-## Database Schema:
+## Database schema (better-sqlite3)
 ```sql
 CREATE TABLE IF NOT EXISTS folders (
   folder_id TEXT PRIMARY KEY,
@@ -59,31 +50,33 @@ CREATE TABLE IF NOT EXISTS files (
 );
 ```
 
-## megajs usage:
-- `File.fromURL({ downloadId: folderId, key: folderKey, directory: true })`
-- `.loadAttributes()` to load tree
-- Flatten children recursively (skip directories)
-- `folder.find(n => n.nodeId === nodeId, true)` to find file
-- `file.download()` returns readable stream - pipe to disk
-- ETOOMANY error = rate limited
+## Environment Variables
+- PORT (default 3000)
+- DOWNLOAD_DIR (default /data/files)
+- DB_PATH (default /data/mega-bridge.db)
+- MAX_CONCURRENT (default 2)
+- RETRY_INTERVAL (default 60, minutes)
 
-## Download worker logic:
-- Spawn MAX_CONCURRENT workers per folder
-- Each worker loops: get next pending file from DB, set downloading, download, set done/error
-- On ETOOMANY: set folder rate_limited=1, stop workers
-- Global setInterval every RETRY_INTERVAL minutes to retry rate-limited folders
-- On startup: resume folders with pending/downloading files
-
-## File storage:
-- Path: DOWNLOAD_DIR/<folderId>/<nodeId>_<filename>
-- Stream to disk with createWriteStream
-- Clean up partial files on error
-- Remove folder directory on DELETE
-
-When done, commit all files, then create the GitHub repo and push:
-```bash
-gh repo create albinmedoc/mega-bridge --public --source=. --remote=origin --push
+## Project structure
+```
+mega-bridge/
+├── Dockerfile
+├── package.json
+├── tsconfig.json
+├── src/
+│   └── server.ts      # All code in single file
+├── README.md
+└── .dockerignore
 ```
 
-When completely finished, run this command to notify me:
-openclaw gateway wake --text "Done: mega-bridge repo created at albinmedoc/mega-bridge with server.js, Dockerfile, CI pipeline" --mode now
+## Important
+- Keep it in a SINGLE server.ts file
+- Stream files from disk with fs.createReadStream, never load into memory
+- megajs File objects are NOT serializable, keep in-memory Map
+- Update Dockerfile for TypeScript build step
+- Update package.json with typescript, @types/better-sqlite3, build script
+- Update GitHub Actions workflow if it exists
+- Update README with all endpoints
+- Commit all changes with a descriptive message and push
+
+When completely finished, run: openclaw gateway wake --text "Trello: MegaJs Proxy omskriven i TypeScript med alla endpoints enligt spec. Pushat till GitHub." --mode now
