@@ -12,11 +12,8 @@ const DB_PATH = process.env.DB_PATH || '/data/mega-bridge.db';
 const MAX_CONCURRENT = parseInt(process.env.MAX_CONCURRENT || '2', 10);
 const RETRY_INTERVAL = parseInt(process.env.RETRY_INTERVAL || '60', 10);
 
-// Ensure database directory and file exist
+// Ensure database directory exists (SQLite creates the file itself)
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-if (!fs.existsSync(DB_PATH)) {
-  fs.writeFileSync(DB_PATH, '');
-}
 
 // Initialize database
 const db = new Database(DB_PATH);
