@@ -12,8 +12,19 @@ const DB_PATH = process.env.DB_PATH || '/data/mega-bridge.db';
 const MAX_CONCURRENT = parseInt(process.env.MAX_CONCURRENT || '2', 10);
 const RETRY_INTERVAL = parseInt(process.env.RETRY_INTERVAL || '60', 10);
 
-// Ensure database directory exists (SQLite creates the file itself)
-fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+// Ensure database directory and download directory exist
+const dbDir = path.dirname(DB_PATH);
+fs.mkdirSync(dbDir, { recursive: true });
+fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+
+// Verify write access to database directory
+try {
+  fs.accessSync(dbDir, fs.constants.W_OK);
+} catch {
+  console.error(`FATAL: Cannot write to database directory: ${dbDir}`);
+  console.error('If running in Docker with a volume mount, ensure the volume is writable by the container user.');
+  process.exit(1);
+}
 
 // Initialize database
 const db = new Database(DB_PATH);
