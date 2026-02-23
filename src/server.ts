@@ -265,9 +265,19 @@ async function loadMegaFolder(url: string): Promise<{ folderId: string; name: st
   // Cache the folder object
   folderCache.set(folderId, folder as mega.File);
 
-  // Get all files in folder
-  const children = folder.children || [];
-  const files = children.filter((child: mega.File) => !child.directory);
+  // Get all files in folder (recursive)
+  function collectFiles(node: mega.File): mega.File[] {
+    const result: mega.File[] = [];
+    for (const child of (node.children || [])) {
+      if (child.directory) {
+        result.push(...collectFiles(child));
+      } else {
+        result.push(child);
+      }
+    }
+    return result;
+  }
+  const files = collectFiles(folder as mega.File);
 
   // Save files to DB and queue downloads
   for (const file of files) {
@@ -321,14 +331,18 @@ async function retryFailedDownloads(folderId: string): Promise<number> {
     folderCache.set(folderId, megaFolder);
   }
 
-  const children = megaFolder.children || [];
   const filesMap = new Map<string, mega.File>();
-  for (const child of children) {
-    if (!child.directory) {
-      const nodeId = child.nodeId || child.downloadId?.[1] || '';
-      filesMap.set(nodeId, child);
+  function mapFiles(node: mega.File) {
+    for (const child of (node.children || [])) {
+      if (child.directory) {
+        mapFiles(child);
+      } else {
+        const nodeId = child.nodeId || child.downloadId?.[1] || '';
+        filesMap.set(nodeId, child);
+      }
     }
   }
+  mapFiles(megaFolder);
 
   // Reset status and queue downloads
   for (const file of filesToRetry) {
@@ -610,14 +624,18 @@ async function resumeDownloads(): Promise<void> {
       await megaFolder.loadAttributes();
       folderCache.set(folderId, megaFolder);
 
-      const children = megaFolder.children || [];
       const filesMap = new Map<string, mega.File>();
-      for (const child of children) {
-        if (!child.directory) {
-          const nodeId = child.nodeId || child.downloadId?.[1] || '';
-          filesMap.set(nodeId, child);
+      function mapFilesResume(node: mega.File) {
+        for (const child of (node.children || [])) {
+          if (child.directory) {
+            mapFilesResume(child);
+          } else {
+            const nodeId = child.nodeId || child.downloadId?.[1] || '';
+            filesMap.set(nodeId, child);
+          }
         }
       }
+      mapFilesResume(megaFolder);
 
       // Queue pending files
       const folderPending = pending.filter(f => f.folder_id === folderId);
