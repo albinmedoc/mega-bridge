@@ -16,6 +16,7 @@ WORKDIR /app
 COPY package.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
+COPY migrations ./migrations
 RUN mkdir -p /data/files
 EXPOSE 3000
 CMD ["node", "dist/server.js"]
