@@ -1,6 +1,6 @@
 # mega-bridge
 
-HTTP proxy that downloads and serves files from shared MEGA folders. Files are downloaded in the background and served from disk.
+HTTP proxy that downloads and serves files from shared MEGA folders. Files are downloaded in the background and served from disk, preserving the original directory structure.
 
 ## Endpoints
 
@@ -21,6 +21,10 @@ HTTP proxy that downloads and serves files from shared MEGA folders. Files are d
 
 - `GET /folder/:folderId/:nodeId` - Download a specific file (streams from disk)
 
+### Metrics
+
+- `GET /metrics` - Queue depth, active downloads, folder/file stats, uptime, and memory usage
+
 ## Environment Variables
 
 | Variable | Default | Description |
@@ -30,14 +34,20 @@ HTTP proxy that downloads and serves files from shared MEGA folders. Files are d
 | `DB_PATH` | `/data/mega-bridge.db` | SQLite database path |
 | `MAX_CONCURRENT` | `2` | Maximum concurrent downloads |
 | `RETRY_INTERVAL` | `60` | Auto-retry interval for rate-limited folders (minutes) |
+| `DOWNLOAD_TIMEOUT` | `300000` | Idle timeout per download in ms (default 5 min) |
+| `MAX_RETRIES` | `10` | Max retry attempts per file/folder before giving up |
 
 ## Features
 
 - Background download workers with configurable concurrency
 - SQLite persistence with better-sqlite3
-- Rate limit detection (ETOOMANY) with automatic retry
+- Rate limit detection (ETOOMANY) with automatic retry and exponential backoff
 - Resume interrupted downloads on startup
 - File streaming from disk (never loaded into memory)
+- Post-download file size verification
+- Idle timeout for stalled downloads
+- Preserves MEGA folder directory structure on disk
+- `/metrics` endpoint for observability
 
 ## Docker
 
