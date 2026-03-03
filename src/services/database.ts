@@ -62,6 +62,12 @@ export class DatabaseService {
       resetFolderRetryCount: this.db.prepare<[string]>(
         'UPDATE folders SET retry_count = 0 WHERE folder_id = ?'
       ),
+      refreshFolderDownloading: this.db.prepare<[string, string]>(`
+        UPDATE folders SET downloading = (
+          SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
+          FROM files WHERE folder_id = ? AND status = 'downloading'
+        ) WHERE folder_id = ?
+      `),
       getRateLimitedFolders: this.db.prepare('SELECT * FROM folders WHERE rate_limited = 1'),
       getFileStats: this.db.prepare(`
         SELECT
@@ -163,11 +169,7 @@ export class DatabaseService {
   // ── Helpers ─────────────────────────────────────────────────────
 
   refreshFolderDownloadingStatus(folderId: string): void {
-    const files = this.getFilesForFolder(folderId);
-    const stillDownloading = files.some(f => f.status === 'downloading');
-    if (!stillDownloading) {
-      this.setFolderDownloading(folderId, false);
-    }
+    this.stmts.refreshFolderDownloading.run(folderId, folderId);
   }
 
   resetInterruptedDownloads(): number {
