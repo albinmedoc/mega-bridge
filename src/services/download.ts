@@ -22,6 +22,7 @@ export class DownloadService {
   private activeDownloads = 0;
   private folderCache = new Map<string, { folder: mega.File; cachedAt: number }>();
   private retryTimer: NodeJS.Timeout | null = null;
+  private retryingFolders = new Set<string>();
 
   constructor(
     private config: AppConfig,
@@ -191,10 +192,17 @@ export class DownloadService {
           continue;
         }
 
+        if (this.retryingFolders.has(folder.folder_id)) {
+          log.debug('Skipping retry, already in progress', { folderId: folder.folder_id });
+          continue;
+        }
+
         log.info('Auto-retrying rate-limited folder', {
           folderId: folder.folder_id,
           retryCount: folder.retry_count,
         });
+
+        this.retryingFolders.add(folder.folder_id);
         try {
           await this.retryFolder(folder.folder_id);
         } catch (err) {
@@ -202,6 +210,8 @@ export class DownloadService {
             folderId: folder.folder_id,
             error: err instanceof Error ? err.message : String(err),
           });
+        } finally {
+          this.retryingFolders.delete(folder.folder_id);
         }
       }
     }, baseIntervalMs);
