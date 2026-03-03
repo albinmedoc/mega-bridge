@@ -31,16 +31,23 @@ export async function loadMegaFolder(url: string): Promise<mega.File> {
   return folder as mega.File;
 }
 
+export interface CollectedFile {
+  file: mega.File;
+  path: string;
+}
+
 /**
- * Recursively collect all non-directory files from a MEGA folder tree.
+ * Recursively collect all non-directory files from a MEGA folder tree,
+ * preserving their relative path within the folder structure.
  */
-export function collectFiles(node: mega.File): mega.File[] {
-  const result: mega.File[] = [];
+export function collectFiles(node: mega.File, parentPath = ''): CollectedFile[] {
+  const result: CollectedFile[] = [];
   for (const child of node.children || []) {
     if (child.directory) {
-      result.push(...collectFiles(child));
+      const dirPath = parentPath ? `${parentPath}/${child.name || 'unknown'}` : (child.name || 'unknown');
+      result.push(...collectFiles(child, dirPath));
     } else {
-      result.push(child);
+      result.push({ file: child, path: parentPath });
     }
   }
   return result;

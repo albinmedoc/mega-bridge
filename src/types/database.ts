@@ -15,6 +15,7 @@ export interface FileRow {
   node_id: string;
   folder_id: string;
   name: string;
+  path: string;
   size: number;
   timestamp: number | null;
   status: FileStatus;

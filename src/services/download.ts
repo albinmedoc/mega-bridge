@@ -51,15 +51,15 @@ export class DownloadService {
 
     const files = collectFiles(megaFolder);
 
-    for (const file of files) {
+    for (const { file, path: filePath } of files) {
       const nodeId = getNodeId(file);
       const fileName = file.name || 'unknown';
       const fileSize = file.size || 0;
       const timestamp = file.timestamp || null;
 
-      this.db.insertFile(nodeId, folderId, fileName, fileSize, timestamp);
+      this.db.insertFile(nodeId, folderId, fileName, filePath, fileSize, timestamp);
 
-      this.queue.push({ folderId, nodeId, megaFile: file, name: fileName, size: fileSize });
+      this.queue.push({ folderId, nodeId, megaFile: file, name: fileName, path: filePath, size: fileSize });
     }
 
     this.processQueue();
@@ -95,7 +95,7 @@ export class DownloadService {
       const megaFile = filesMap.get(file.node_id);
       if (megaFile) {
         this.queue.push({
-          folderId, nodeId: file.node_id, megaFile, name: file.name, size: file.size,
+          folderId, nodeId: file.node_id, megaFile, name: file.name, path: file.path, size: file.size,
         });
       }
     }
@@ -134,9 +134,9 @@ export class DownloadService {
     };
   }
 
-  getFilePath(folderId: string, nodeId: string, filename: string): string {
+  getFilePath(folderId: string, nodeId: string, filename: string, subPath = ''): string {
     const safeName = path.basename(filename);
-    return path.join(this.config.downloadDir, folderId, `${nodeId}_${safeName}`);
+    return path.join(this.config.downloadDir, folderId, subPath, `${nodeId}_${safeName}`);
   }
 
   async resumeDownloads(): Promise<void> {
@@ -163,7 +163,7 @@ export class DownloadService {
           const megaFile = filesMap.get(file.node_id);
           if (megaFile) {
             this.queue.push({
-              folderId, nodeId: file.node_id, megaFile, name: file.name, size: file.size,
+              folderId, nodeId: file.node_id, megaFile, name: file.name, path: file.path, size: file.size,
             });
           }
         }
@@ -269,8 +269,8 @@ export class DownloadService {
   }
 
   private async downloadFile(task: DownloadTask): Promise<void> {
-    const { folderId, nodeId, megaFile, name, size } = task;
-    const filePath = this.getFilePath(folderId, nodeId, name);
+    const { folderId, nodeId, megaFile, name, path: subPath, size } = task;
+    const filePath = this.getFilePath(folderId, nodeId, name, subPath);
 
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
 

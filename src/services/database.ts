@@ -37,9 +37,9 @@ export class DatabaseService {
       updateFolderRateLimited: this.db.prepare<[number, string | null, string]>(
         'UPDATE folders SET rate_limited = ?, rate_limited_at = ? WHERE folder_id = ?'
       ),
-      insertFile: this.db.prepare<[string, string, string, number, number | null, string, string | null, string | null, string | null]>(`
-        INSERT OR REPLACE INTO files (node_id, folder_id, name, size, timestamp, status, error, started_at, completed_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      insertFile: this.db.prepare<[string, string, string, string, number, number | null, string, string | null, string | null, string | null]>(`
+        INSERT OR REPLACE INTO files (node_id, folder_id, name, path, size, timestamp, status, error, started_at, completed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `),
       getFile: this.db.prepare<[string, string]>(
         'SELECT * FROM files WHERE folder_id = ? AND node_id = ?'
@@ -117,9 +117,9 @@ export class DatabaseService {
   // ── File operations ─────────────────────────────────────────────
 
   insertFile(
-    nodeId: string, folderId: string, name: string, size: number, timestamp: number | null,
+    nodeId: string, folderId: string, name: string, filePath: string, size: number, timestamp: number | null,
   ): void {
-    this.stmts.insertFile.run(nodeId, folderId, name, size, timestamp, 'pending', null, null, null);
+    this.stmts.insertFile.run(nodeId, folderId, name, filePath, size, timestamp, 'pending', null, null, null);
   }
 
   getFile(folderId: string, nodeId: string): FileRow | undefined {

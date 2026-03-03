@@ -5,5 +5,6 @@ export interface DownloadTask {
   nodeId: string;
   megaFile: mega.File;
   name: string;
+  path: string;
   size: number;
 }

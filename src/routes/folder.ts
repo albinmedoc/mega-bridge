@@ -85,6 +85,7 @@ export function folderRouter(db: DatabaseService, downloads: DownloadService): R
       files: files.map(f => ({
         nodeId: f.node_id,
         name: f.name,
+        path: f.path,
         size: f.size,
         timestamp: f.timestamp,
         status: f.status,
@@ -111,7 +112,7 @@ export function folderRouter(db: DatabaseService, downloads: DownloadService): R
       return;
     }
 
-    const filePath = downloads.getFilePath(folderId, nodeId, file.name);
+    const filePath = downloads.getFilePath(folderId, nodeId, file.name, file.path);
 
     if (!fs.existsSync(filePath)) {
       res.status(404).json({ error: 'File not found on disk' });
