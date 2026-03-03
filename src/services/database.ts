@@ -62,6 +62,9 @@ export class DatabaseService {
       resetFolderRetryCount: this.db.prepare<[string]>(
         'UPDATE folders SET retry_count = 0 WHERE folder_id = ?'
       ),
+      resetFileRetryCountsForFolder: this.db.prepare<[string]>(
+        'UPDATE files SET retry_count = 0 WHERE folder_id = ?'
+      ),
       refreshFolderDownloading: this.db.prepare<[string, string]>(`
         UPDATE folders SET downloading = (
           SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
@@ -156,6 +159,10 @@ export class DatabaseService {
 
   resetFolderRetryCount(folderId: string): void {
     this.stmts.resetFolderRetryCount.run(folderId);
+  }
+
+  resetFileRetryCountsForFolder(folderId: string): void {
+    this.stmts.resetFileRetryCountsForFolder.run(folderId);
   }
 
   getRateLimitedFolders(): FolderRow[] {

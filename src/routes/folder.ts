@@ -144,7 +144,7 @@ export function folderRouter(db: DatabaseService, downloads: DownloadService): R
 
   router.post('/:folderId/retry', async (req, res, next) => {
     try {
-      const count = await downloads.retryFolder(req.params.folderId);
+      const count = await downloads.manualRetryFolder(req.params.folderId);
       res.json({ message: 'Retrying failed downloads', count });
     } catch (err) {
       next(err);

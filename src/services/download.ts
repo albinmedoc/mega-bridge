@@ -75,18 +75,36 @@ export class DownloadService {
       return 0;
     }
 
-    this.db.setFolderRateLimited(folderId, false);
     this.db.incrementFolderRetryCount(folderId);
+
+    return this.requeueFolder(folderId, folder.folder_key, true);
+  }
+
+  async manualRetryFolder(folderId: string): Promise<number> {
+    const folder = this.db.getFolder(folderId);
+    if (!folder) throw new NotFoundError('Folder not found');
+
+    // Manual retry resets all counters so the user can always force a retry
+    this.db.resetFolderRetryCount(folderId);
+    this.db.resetFileRetryCountsForFolder(folderId);
+
+    return this.requeueFolder(folderId, folder.folder_key, false);
+  }
+
+  private async requeueFolder(folderId: string, folderKey: string, respectMaxRetries: boolean): Promise<number> {
+    this.db.setFolderRateLimited(folderId, false);
 
     const failed = this.db.getFilesByFolderAndStatus(folderId, 'failed');
     const pending = this.db.getFilesByFolderAndStatus(folderId, 'pending');
-    const filesToRetry = [...failed, ...pending].filter(
-      f => f.retry_count < this.config.maxRetries
-    );
+    let filesToRetry = [...failed, ...pending];
+
+    if (respectMaxRetries) {
+      filesToRetry = filesToRetry.filter(f => f.retry_count < this.config.maxRetries);
+    }
 
     if (filesToRetry.length === 0) return 0;
 
-    const megaFolder = await this.ensureFolderLoaded(folderId, folder.folder_key);
+    const megaFolder = await this.ensureFolderLoaded(folderId, folderKey);
     const filesMap = buildFileMap(megaFolder);
 
     for (const file of filesToRetry) {

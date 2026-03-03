@@ -33,7 +33,7 @@ HTTP proxy that downloads and serves files from shared MEGA folders. Files are d
 | `DOWNLOAD_DIR` | `/data/files` | Directory for downloaded files |
 | `DB_PATH` | `/data/mega-bridge.db` | SQLite database path |
 | `MAX_CONCURRENT` | `2` | Maximum concurrent downloads |
-| `RETRY_INTERVAL` | `60` | Auto-retry interval for rate-limited folders (minutes) |
+| `RETRY_INTERVAL` | `1440` | Base auto-retry interval for rate-limited folders in minutes (default 24h) |
 | `DOWNLOAD_TIMEOUT` | `300000` | Idle timeout per download in ms (default 5 min) |
 | `MAX_RETRIES` | `10` | Max retry attempts per file/folder before giving up |
 

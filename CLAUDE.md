@@ -49,7 +49,7 @@ There are no test or lint commands configured.
 | DOWNLOAD_DIR | /data/files | File storage path |
 | DB_PATH | /data/mega-bridge.db | SQLite database path |
 | MAX_CONCURRENT | 2 | Concurrent download limit |
-| RETRY_INTERVAL | 60 | Minutes between auto-retries |
+| RETRY_INTERVAL | 1440 | Base minutes between auto-retries (default 24h) |
 | DOWNLOAD_TIMEOUT | 300000 | Idle timeout per download (ms) |
 | MAX_RETRIES | 10 | Max retry attempts per file/folder |
 | LOG_LEVEL | INFO | DEBUG/INFO/WARN/ERROR |
