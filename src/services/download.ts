@@ -20,7 +20,7 @@ const log = new Logger('download');
 export class DownloadService {
   private queue: DownloadTask[] = [];
   private activeDownloads = 0;
-  private folderCache = new Map<string, mega.File>();
+  private folderCache = new Map<string, { folder: mega.File; cachedAt: number }>();
   private retryTimer: NodeJS.Timeout | null = null;
 
   constructor(
@@ -46,7 +46,7 @@ export class DownloadService {
     const folderName = megaFolder.name || folderId;
 
     this.db.insertFolder(folderId, folderKey, folderName);
-    this.folderCache.set(folderId, megaFolder);
+    this.folderCache.set(folderId, { folder: megaFolder, cachedAt: Date.now() });
 
     const files = collectFiles(megaFolder);
 
@@ -220,13 +220,21 @@ export class DownloadService {
   // ── Private ───────────────────────────────────────────────────────
 
   private async ensureFolderLoaded(folderId: string, folderKey: string): Promise<mega.File> {
-    let megaFolder = this.folderCache.get(folderId);
-    if (!megaFolder) {
-      const url = buildMegaFolderUrl(folderId, folderKey);
-      megaFolder = await loadMegaFolder(url);
-      this.folderCache.set(folderId, megaFolder);
-    }
+    const cached = this.folderCache.get(folderId);
+    if (cached) return cached.folder;
+
+    const url = buildMegaFolderUrl(folderId, folderKey);
+    const megaFolder = await loadMegaFolder(url);
+    this.folderCache.set(folderId, { folder: megaFolder, cachedAt: Date.now() });
     return megaFolder;
+  }
+
+  private evictCacheIfIdle(folderId: string): void {
+    const hasActiveWork = this.queue.some(t => t.folderId === folderId);
+    if (!hasActiveWork) {
+      this.folderCache.delete(folderId);
+      log.debug('Evicted folder cache', { folderId });
+    }
   }
 
   private processQueue(): void {
@@ -293,6 +301,7 @@ export class DownloadService {
           }
 
           this.db.refreshFolderDownloadingStatus(folderId);
+          this.evictCacheIfIdle(folderId);
           resolve();
         });
 
@@ -302,6 +311,7 @@ export class DownloadService {
           log.info('Download completed', { name, folderId });
           this.db.updateFileStatus(folderId, nodeId, 'completed', null, startedAt, completedAt);
           this.db.refreshFolderDownloadingStatus(folderId);
+          this.evictCacheIfIdle(folderId);
           resolve();
         });
 
@@ -312,6 +322,7 @@ export class DownloadService {
           log.error('Write failed', { name, error: err.message });
           this.db.updateFileStatus(folderId, nodeId, 'failed', err.message, startedAt, completedAt);
           this.db.refreshFolderDownloadingStatus(folderId);
+          this.evictCacheIfIdle(folderId);
           resolve();
         });
 
