@@ -53,6 +53,15 @@ export class DatabaseService {
       getFilesByFolderAndStatus: this.db.prepare<[string, string]>(
         'SELECT * FROM files WHERE folder_id = ? AND status = ?'
       ),
+      incrementFileRetryCount: this.db.prepare<[string, string]>(
+        'UPDATE files SET retry_count = retry_count + 1 WHERE folder_id = ? AND node_id = ?'
+      ),
+      incrementFolderRetryCount: this.db.prepare<[string]>(
+        'UPDATE folders SET retry_count = retry_count + 1 WHERE folder_id = ?'
+      ),
+      resetFolderRetryCount: this.db.prepare<[string]>(
+        'UPDATE folders SET retry_count = 0 WHERE folder_id = ?'
+      ),
       getRateLimitedFolders: this.db.prepare('SELECT * FROM folders WHERE rate_limited = 1'),
       getFileStats: this.db.prepare(`
         SELECT
@@ -129,6 +138,18 @@ export class DatabaseService {
 
   getFilesByFolderAndStatus(folderId: string, status: string): FileRow[] {
     return this.stmts.getFilesByFolderAndStatus.all(folderId, status) as FileRow[];
+  }
+
+  incrementFileRetryCount(folderId: string, nodeId: string): void {
+    this.stmts.incrementFileRetryCount.run(folderId, nodeId);
+  }
+
+  incrementFolderRetryCount(folderId: string): void {
+    this.stmts.incrementFolderRetryCount.run(folderId);
+  }
+
+  resetFolderRetryCount(folderId: string): void {
+    this.stmts.resetFolderRetryCount.run(folderId);
   }
 
   getRateLimitedFolders(): FolderRow[] {

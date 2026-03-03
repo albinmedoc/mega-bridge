@@ -8,6 +8,7 @@ export interface FolderRow {
   downloading: number;
   rate_limited: number;
   rate_limited_at: string | null;
+  retry_count: number;
 }
 
 export interface FileRow {
@@ -20,6 +21,7 @@ export interface FileRow {
   error: string | null;
   started_at: string | null;
   completed_at: string | null;
+  retry_count: number;
 }
 
 export interface FileStatsRow {

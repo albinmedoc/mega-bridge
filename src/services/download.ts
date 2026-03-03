@@ -69,11 +69,19 @@ export class DownloadService {
     const folder = this.db.getFolder(folderId);
     if (!folder) throw new NotFoundError('Folder not found');
 
+    if (folder.retry_count >= this.config.maxRetries) {
+      log.warn('Folder exceeded max retries, skipping', { folderId, retryCount: folder.retry_count });
+      return 0;
+    }
+
     this.db.setFolderRateLimited(folderId, false);
+    this.db.incrementFolderRetryCount(folderId);
 
     const failed = this.db.getFilesByFolderAndStatus(folderId, 'failed');
     const pending = this.db.getFilesByFolderAndStatus(folderId, 'pending');
-    const filesToRetry = [...failed, ...pending];
+    const filesToRetry = [...failed, ...pending].filter(
+      f => f.retry_count < this.config.maxRetries
+    );
 
     if (filesToRetry.length === 0) return 0;
 
@@ -163,12 +171,30 @@ export class DownloadService {
   }
 
   startRetryTimer(): void {
-    const intervalMs = this.config.retryIntervalMinutes * 60 * 1000;
+    const baseIntervalMs = this.config.retryIntervalMinutes * 60 * 1000;
 
     this.retryTimer = setInterval(async () => {
       const rateLimited = this.db.getRateLimitedFolders();
+      const now = Date.now();
+
       for (const folder of rateLimited) {
-        log.info('Auto-retrying rate-limited folder', { folderId: folder.folder_id });
+        // Exponential backoff: wait baseInterval * 2^(retryCount-1) since last rate limit
+        const backoffMs = baseIntervalMs * Math.pow(2, Math.min(folder.retry_count, 6));
+        const rateLimitedAt = folder.rate_limited_at ? new Date(folder.rate_limited_at).getTime() : 0;
+
+        if (now - rateLimitedAt < backoffMs) {
+          log.debug('Skipping retry, backoff not elapsed', {
+            folderId: folder.folder_id,
+            retryCount: folder.retry_count,
+            backoffMinutes: Math.round(backoffMs / 60000),
+          });
+          continue;
+        }
+
+        log.info('Auto-retrying rate-limited folder', {
+          folderId: folder.folder_id,
+          retryCount: folder.retry_count,
+        });
         try {
           await this.retryFolder(folder.folder_id);
         } catch (err) {
@@ -178,7 +204,7 @@ export class DownloadService {
           });
         }
       }
-    }, intervalMs);
+    }, baseIntervalMs);
 
     this.retryTimer.unref();
   }
@@ -254,6 +280,8 @@ export class DownloadService {
           clearIdle();
           writeStream.destroy();
           const completedAt = new Date().toISOString();
+
+          this.db.incrementFileRetryCount(folderId, nodeId);
 
           if (err.message.includes('ETOOMANY') || err.message.includes('Too many')) {
             log.warn('Rate limited', { name, folderId });

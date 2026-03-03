@@ -10,6 +10,7 @@ export interface AppConfig {
   requestBodyMaxBytes: number;
   shutdownTimeoutMs: number;
   downloadTimeoutMs: number;
+  maxRetries: number;
 }
 
 function requirePositiveInt(value: string | undefined, fallback: number, name: string): number {
@@ -31,6 +32,7 @@ export function loadConfig(): AppConfig {
     requestBodyMaxBytes: requirePositiveInt(process.env.REQUEST_BODY_MAX_BYTES, 1_048_576, 'REQUEST_BODY_MAX_BYTES'),
     shutdownTimeoutMs: requirePositiveInt(process.env.SHUTDOWN_TIMEOUT_MS, 30_000, 'SHUTDOWN_TIMEOUT_MS'),
     downloadTimeoutMs: requirePositiveInt(process.env.DOWNLOAD_TIMEOUT, 300_000, 'DOWNLOAD_TIMEOUT'),
+    maxRetries: requirePositiveInt(process.env.MAX_RETRIES, 10, 'MAX_RETRIES'),
   };
 
   // Ensure directories exist
