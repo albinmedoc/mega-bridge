@@ -9,6 +9,7 @@ export interface FolderRow {
   rate_limited: number;
   rate_limited_at: string | null;
   retry_count: number;
+  patterns: string | null;
 }
 
 export interface FileRow {

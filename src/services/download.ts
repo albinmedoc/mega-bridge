@@ -31,7 +31,7 @@ export class DownloadService {
 
   // ── Public API ────────────────────────────────────────────────────
 
-  async addFolder(url: string): Promise<{ folderId: string; name: string; fileCount: number }> {
+  async addFolder(url: string, patterns?: string[]): Promise<{ folderId: string; name: string; fileCount: number }> {
     const parsed = parseMegaFolderUrl(url);
     if (!parsed) {
       throw new AppError('Invalid MEGA folder URL');
@@ -46,10 +46,10 @@ export class DownloadService {
     const megaFolder = await loadMegaFolder(url);
     const folderName = megaFolder.name || folderId;
 
-    this.db.insertFolder(folderId, folderKey, folderName);
+    this.db.insertFolder(folderId, folderKey, folderName, patterns);
     this.folderCache.set(folderId, { folder: megaFolder, cachedAt: Date.now() });
 
-    const files = collectFiles(megaFolder);
+    const files = collectFiles(megaFolder, '', patterns);
 
     for (const { file, path: filePath } of files) {
       const nodeId = getNodeId(file);

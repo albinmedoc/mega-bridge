@@ -43,13 +43,19 @@ export function folderRouter(db: DatabaseService, downloads: DownloadService): R
 
   router.post('/', async (req, res, next) => {
     try {
-      const { url } = req.body;
+      const { url, patterns } = req.body;
 
       if (!url || typeof url !== 'string') {
         throw new AppError('Missing required field: url');
       }
 
-      const result = await downloads.addFolder(url);
+      if (patterns !== undefined) {
+        if (!Array.isArray(patterns) || !patterns.every((p: unknown) => typeof p === 'string')) {
+          throw new AppError('patterns must be an array of strings');
+        }
+      }
+
+      const result = await downloads.addFolder(url, patterns);
 
       res.status(201).json({
         folderId: result.folderId,

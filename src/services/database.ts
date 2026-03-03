@@ -24,9 +24,9 @@ export class DatabaseService {
 
   private prepareStatements() {
     return {
-      insertFolder: this.db.prepare<[string, string, string, string, number, number, string | null]>(`
-        INSERT OR REPLACE INTO folders (folder_id, folder_key, name, loaded_at, downloading, rate_limited, rate_limited_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+      insertFolder: this.db.prepare<[string, string, string, string, number, number, string | null, string | null]>(`
+        INSERT OR REPLACE INTO folders (folder_id, folder_key, name, loaded_at, downloading, rate_limited, rate_limited_at, patterns)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `),
       getFolder: this.db.prepare<[string]>('SELECT * FROM folders WHERE folder_id = ?'),
       getAllFolders: this.db.prepare('SELECT * FROM folders'),
@@ -88,9 +88,10 @@ export class DatabaseService {
 
   // ── Folder operations ───────────────────────────────────────────
 
-  insertFolder(folderId: string, folderKey: string, name: string): void {
+  insertFolder(folderId: string, folderKey: string, name: string, patterns?: string[]): void {
     const now = new Date().toISOString();
-    this.stmts.insertFolder.run(folderId, folderKey, name, now, 0, 0, null);
+    const patternsJson = patterns && patterns.length > 0 ? JSON.stringify(patterns) : null;
+    this.stmts.insertFolder.run(folderId, folderKey, name, now, 0, 0, null, patternsJson);
   }
 
   getFolder(folderId: string): FolderRow | undefined {

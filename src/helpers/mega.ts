@@ -1,4 +1,5 @@
 import mega from 'megajs';
+import picomatch from 'picomatch';
 import { Logger } from './logger';
 
 const log = new Logger('mega');
@@ -39,17 +40,30 @@ export interface CollectedFile {
 /**
  * Recursively collect all non-directory files from a MEGA folder tree,
  * preserving their relative path within the folder structure.
+ * When patterns are provided, only files whose full relative path matches
+ * at least one glob pattern are included.
  */
-export function collectFiles(node: mega.File, parentPath = ''): CollectedFile[] {
+export function collectFiles(node: mega.File, parentPath = '', patterns?: string[]): CollectedFile[] {
   const result: CollectedFile[] = [];
   for (const child of node.children || []) {
     if (child.directory) {
       const dirPath = parentPath ? `${parentPath}/${child.name || 'unknown'}` : (child.name || 'unknown');
-      result.push(...collectFiles(child, dirPath));
+      result.push(...collectFiles(child, dirPath, patterns));
     } else {
       result.push({ file: child, path: parentPath });
     }
   }
+
+  // Only filter at the top-level call (parentPath === '') to avoid filtering partial results
+  if (parentPath === '' && patterns && patterns.length > 0) {
+    const isMatch = picomatch(patterns);
+    return result.filter(({ file, path: filePath }) => {
+      const name = file.name || 'unknown';
+      const fullPath = filePath ? `${filePath}/${name}` : name;
+      return isMatch(fullPath);
+    });
+  }
+
   return result;
 }
 
