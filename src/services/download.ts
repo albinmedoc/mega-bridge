@@ -118,7 +118,8 @@ export class DownloadService {
   }
 
   getFilePath(folderId: string, nodeId: string, filename: string): string {
-    return path.join(this.config.downloadDir, folderId, `${nodeId}_${filename}`);
+    const safeName = path.basename(filename);
+    return path.join(this.config.downloadDir, folderId, `${nodeId}_${safeName}`);
   }
 
   async resumeDownloads(): Promise<void> {
