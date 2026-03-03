@@ -126,6 +126,14 @@ export class DownloadService {
     log.info('Folder removed', { folderId });
   }
 
+  getMetrics(): { queueDepth: number; activeDownloads: number; cachedFolders: number } {
+    return {
+      queueDepth: this.queue.length,
+      activeDownloads: this.activeDownloads,
+      cachedFolders: this.folderCache.size,
+    };
+  }
+
   getFilePath(folderId: string, nodeId: string, filename: string): string {
     const safeName = path.basename(filename);
     return path.join(this.config.downloadDir, folderId, `${nodeId}_${safeName}`);
