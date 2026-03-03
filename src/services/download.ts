@@ -318,6 +318,36 @@ export class DownloadService {
         writeStream.on('finish', () => {
           clearIdle();
           const completedAt = new Date().toISOString();
+
+          // Verify file size matches expected size from MEGA
+          if (size > 0) {
+            try {
+              const stat = fs.statSync(filePath);
+              if (stat.size !== size) {
+                log.error('File size mismatch', {
+                  name, folderId, expected: size, actual: stat.size,
+                });
+                this.db.updateFileStatus(folderId, nodeId, 'failed',
+                  `Size mismatch: expected ${size} bytes, got ${stat.size}`,
+                  startedAt, completedAt);
+                this.db.incrementFileRetryCount(folderId, nodeId);
+                this.db.refreshFolderDownloadingStatus(folderId);
+                this.evictCacheIfIdle(folderId);
+                resolve();
+                return;
+              }
+            } catch {
+              // If we can't stat the file, treat as failure
+              log.error('Cannot verify downloaded file', { name, folderId });
+              this.db.updateFileStatus(folderId, nodeId, 'failed',
+                'File verification failed', startedAt, completedAt);
+              this.db.refreshFolderDownloadingStatus(folderId);
+              this.evictCacheIfIdle(folderId);
+              resolve();
+              return;
+            }
+          }
+
           log.info('Download completed', { name, folderId });
           this.db.updateFileStatus(folderId, nodeId, 'completed', null, startedAt, completedAt);
           this.db.refreshFolderDownloadingStatus(folderId);
