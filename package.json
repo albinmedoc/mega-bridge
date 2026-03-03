@@ -6,7 +6,10 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
-    "dev": "DOWNLOAD_DIR=./data/files DB_PATH=./data/mega-bridge.db npx tsx --watch src/server.ts"
+    "dev": "DOWNLOAD_DIR=./data/files DB_PATH=./data/mega-bridge.db npx tsx --watch src/server.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
@@ -19,7 +22,9 @@
     "@types/express": "^5.0.6",
     "@types/node": "^22.10.0",
     "@types/picomatch": "^4.0.2",
+    "@vitest/coverage-v8": "^4.0.18",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
   }
 }
