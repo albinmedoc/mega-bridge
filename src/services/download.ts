@@ -233,7 +233,25 @@ export class DownloadService {
         const stream = megaFile.download({});
         const writeStream = fs.createWriteStream(filePath);
 
+        // Idle timeout: if no data received within the timeout, abort the download
+        let idleTimer: NodeJS.Timeout | null = null;
+        const resetIdleTimer = () => {
+          if (idleTimer) clearTimeout(idleTimer);
+          idleTimer = setTimeout(() => {
+            log.warn('Download timed out (idle)', { name, folderId });
+            stream.destroy(new Error('Download timed out: no data received'));
+          }, this.config.downloadTimeoutMs);
+        };
+
+        stream.on('data', resetIdleTimer);
+        resetIdleTimer();
+
+        const clearIdle = () => {
+          if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+        };
+
         stream.on('error', (err: Error) => {
+          clearIdle();
           writeStream.destroy();
           const completedAt = new Date().toISOString();
 
@@ -251,6 +269,7 @@ export class DownloadService {
         });
 
         writeStream.on('finish', () => {
+          clearIdle();
           const completedAt = new Date().toISOString();
           log.info('Download completed', { name, folderId });
           this.db.updateFileStatus(folderId, nodeId, 'completed', null, startedAt, completedAt);
@@ -259,6 +278,7 @@ export class DownloadService {
         });
 
         writeStream.on('error', (err: Error) => {
+          clearIdle();
           stream.destroy();
           const completedAt = new Date().toISOString();
           log.error('Write failed', { name, error: err.message });
