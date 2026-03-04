@@ -286,6 +286,25 @@ export class DownloadService {
     }
   }
 
+  private isRateLimitError(message: string): boolean {
+    return message.includes('ETOOMANY')
+      || message.includes('Too many')
+      || message.includes('Bandwidth limit');
+  }
+
+  private drainQueueForFolder(folderId: string): number {
+    let drained = 0;
+    for (let i = this.queue.length - 1; i >= 0; i--) {
+      if (this.queue[i].folderId === folderId) {
+        const task = this.queue[i];
+        this.db.updateFileStatus(folderId, task.nodeId, 'pending', 'Rate limited (queued)', null, null);
+        this.queue.splice(i, 1);
+        drained++;
+      }
+    }
+    return drained;
+  }
+
   private async downloadFile(task: DownloadTask): Promise<void> {
     const { folderId, nodeId, megaFile, name, path: subPath, size } = task;
     const filePath = this.getFilePath(folderId, nodeId, name, subPath);
@@ -302,6 +321,7 @@ export class DownloadService {
       try {
         const stream = megaFile.download({});
         const writeStream = fs.createWriteStream(filePath);
+        let settled = false;
 
         // Idle timeout: if no data received within the timeout, abort the download
         let idleTimer: NodeJS.Timeout | null = null;
@@ -320,28 +340,46 @@ export class DownloadService {
           if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
         };
 
-        stream.on('error', (err: Error) => {
+        const handleError = (err: Error, source: 'stream' | 'write') => {
+          if (settled) return;
+          settled = true;
           clearIdle();
-          writeStream.destroy();
-          const completedAt = new Date().toISOString();
 
-          this.db.incrementFileRetryCount(folderId, nodeId);
+          if (source === 'stream') {
+            writeStream.destroy();
+          } else {
+            stream.destroy();
+          }
 
-          if (err.message.includes('ETOOMANY') || err.message.includes('Too many')) {
+          // Clean up partial file
+          try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+
+          if (this.isRateLimitError(err.message)) {
             log.warn('Rate limited', { name, folderId });
             this.db.updateFileStatus(folderId, nodeId, 'pending', 'Rate limited', null, null);
             this.db.setFolderRateLimited(folderId, true);
+
+            const drained = this.drainQueueForFolder(folderId);
+            if (drained > 0) {
+              log.info('Drained queued downloads for rate-limited folder', { folderId, count: drained });
+            }
           } else {
             log.error('Download failed', { name, error: err.message });
+            const completedAt = new Date().toISOString();
             this.db.updateFileStatus(folderId, nodeId, 'failed', err.message, startedAt, completedAt);
+            this.db.incrementFileRetryCount(folderId, nodeId);
           }
 
           this.db.refreshFolderDownloadingStatus(folderId);
           this.evictCacheIfIdle(folderId);
           resolve();
-        });
+        };
+
+        stream.on('error', (err: Error) => handleError(err, 'stream'));
 
         writeStream.on('finish', () => {
+          if (settled) return;
+          settled = true;
           clearIdle();
           const completedAt = new Date().toISOString();
 
@@ -381,16 +419,7 @@ export class DownloadService {
           resolve();
         });
 
-        writeStream.on('error', (err: Error) => {
-          clearIdle();
-          stream.destroy();
-          const completedAt = new Date().toISOString();
-          log.error('Write failed', { name, error: err.message });
-          this.db.updateFileStatus(folderId, nodeId, 'failed', err.message, startedAt, completedAt);
-          this.db.refreshFolderDownloadingStatus(folderId);
-          this.evictCacheIfIdle(folderId);
-          resolve();
-        });
+        writeStream.on('error', (err: Error) => handleError(err, 'write'));
 
         stream.pipe(writeStream);
       } catch (err) {
